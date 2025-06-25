@@ -4,7 +4,7 @@ import { courseCategories, courseLevels, courseSchema, CourseSchemaType, courseS
 import { ControllerFieldState, ControllerRenderProps, useForm, UseFormStateReturn, } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { ArrowLeft, PlugIcon, PlusIcon, SparkleIcon } from "lucide-react";
+import { ArrowLeft, Loader2, PlugIcon, PlusIcon, SparkleIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/rich-text-editor/Editor";
 import { Uploader } from "@/components/file-uploader/Uploader";
+import { CreateCourse } from "./actions";
+import { useTransition } from "react";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function CourseCreationPage(){
+    const [isPending, startEmailTransition] = useTransition();
+    const router = useRouter();
     // 1. Define your form.
   const form = useForm<CourseSchemaType>({
     resolver: zodResolver(courseSchema),
@@ -32,11 +38,22 @@ export default function CourseCreationPage(){
 
     },
   });
-  // 2. Define a submit handler.
-  function onSubmit(values:CourseSchemaType) {
-    console.log(values)
+  function onSubmit(values : CourseSchemaType) {
+    startEmailTransition(async() => {
+        try {
+            const result = await CreateCourse(values);
+            if(result?.status === "success") {
+                toast.success(result.message);
+                form.reset();
+                router.push("/admin/courses");
+            } else if (result?.status === "error") {
+                toast.error(result.message);
+            }
+        } catch (error) {
+            toast.error("An unexpected error occurred. Please try again.");
+        }
+    });
   }
-
     return(
         <>
         <div className="flex items-center gap-4">
@@ -137,7 +154,7 @@ export default function CourseCreationPage(){
                                  <FormItem className="w-full">
                                     <FormLabel>Thumbnail image</FormLabel>
                                     <FormControl>
-                                        <Uploader />
+                                        <Uploader onChange={(value) => field.onChange(value)} value={field.value} />
                                         {/* <Input placeholder="Thumbnail url"  {...field} /> */}
                                     </FormControl>
                                     <FormMessage  />
@@ -254,9 +271,15 @@ export default function CourseCreationPage(){
                                 </FormItem>
                             )}
                         />
-
-                        <Button>
-                            Create Course<PlusIcon className="ml-2" size={16} />
+                        <Button type ="submit" disabled={isPending}>
+                            {isPending ? (
+                                <>
+                                Creating...
+                                <Loader2 className="animate-spin ml-1" size={16} />
+                                </>
+                            ) : (
+                                <>Create Course<PlusIcon className="ml-1" size={16} /></>
+                            )}
                         </Button>
                     </form>
                 </Form>
@@ -265,4 +288,3 @@ export default function CourseCreationPage(){
         </>
     );
 }
-
