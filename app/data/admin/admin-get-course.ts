@@ -35,9 +35,11 @@ export async function adminGetCourse(id: string) {
                             thumbnail: true,
                             position: true,
                             videoKey: true,
-                        }
+                        },
+                        orderBy: { position: 'asc' }
                     }
-                }
+                },
+                orderBy: { position: 'asc' }
             }
         }
     });
