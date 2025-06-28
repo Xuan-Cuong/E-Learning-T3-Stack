@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { object, set } from "zod";
 import {v4 as uuidv4} from 'uuid';
 import { ca, tr } from "zod/v4/locales";
+import { useConstructUrl } from "@/hooks/use-construct";
 
 interface UploadState {
     id : string | null;
@@ -28,7 +29,7 @@ interface iAppProps{
 }
 
 export function Uploader({onChange, value}: iAppProps) {
-
+    const fileUrl = useConstructUrl(value || '');
     const [fileState, setFileState] = useState<UploadState>({
         error: false,
         file: null,
@@ -38,6 +39,7 @@ export function Uploader({onChange, value}: iAppProps) {
         isDeleting: false,
         fileType: "image",
         key: value,
+        objectUrl: fileUrl
     });
 
     

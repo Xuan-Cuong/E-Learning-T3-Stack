@@ -1,5 +1,24 @@
+import { requireAdmin } from "@/app/data/admin/require-admin";
+import { auth } from "@/lib/auth";
+import arcjet, { detectBot, fixedWindow } from "@arcjet/next";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+
+const aj = arcjet({
+    key: process.env.ARCJET_KEY!,
+    rules: [
+        detectBot({
+            mode: 'LIVE',
+            allow: [],
+        }),
+        fixedWindow({
+            mode: 'LIVE',
+            window: "1m",
+            max: 2,
+        })
+    ]
+});
 
 // Simple S3 client similar to upload route
 const S3 = new S3Client({
@@ -14,6 +33,13 @@ const S3 = new S3Client({
 
 export async function DELETE(request: Request) {
     try {
+        const session = await requireAdmin();
+        const decision = await aj.protect(request);
+        
+        if(decision.isDenied()){
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+        }
+        
         const body = await request.json();
 
         const { key } = body;

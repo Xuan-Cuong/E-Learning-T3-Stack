@@ -9,7 +9,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model User {
   id            String    @id
   name          String
@@ -21,6 +20,11 @@ model User {
   sessions      Session[]
   accounts      Account[]
   courses       Course[]
+
+  role       String?
+  banned     Boolean?
+  banReason  String?
+  banExpires DateTime?
 
   @@unique([email])
   @@map("user")
@@ -36,6 +40,8 @@ model Session {
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  impersonatedBy String?
 
   @@unique([token])
   @@map("session")
@@ -72,30 +78,30 @@ model Verification {
 }
 
 model Course {
-  id  String @id @default(uuid())
+  id String @id @default(uuid())
 
-  title String
+  title       String
   description String
-  fileKey String
-  price Int
-  duration Int
-  level CourseLevel @default(Beginner)
+  fileKey     String
+  price       Int
+  duration    Int
+  level       CourseLevel @default(Beginner)
 
-  categories String 
-  smallDescription String 
-  slug String @unique
+  categories       String
+  smallDescription String
+  slug             String @unique
 
   status CourseStatus @default(Draft)
 
-
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  chapters  Chapter[]
 }
 
-enum CourseLevel{
+enum CourseLevel {
   Beginner
   Intermediate
   Advanced
@@ -105,4 +111,32 @@ enum CourseStatus {
   Draft
   Published
   Archived
+}
+
+model Chapter {
+  id String @id @default(uuid())
+  title String
+  position Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId String
+
+  lessons Lesson[]
+}
+
+model Lesson {
+  id String @id @default(uuid())
+  title String
+  discription String?
+  thumbnail String?
+  videoKey String?
+  position Int
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  chapterId String
+
 }

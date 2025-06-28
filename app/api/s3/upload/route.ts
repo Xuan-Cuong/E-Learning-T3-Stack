@@ -4,6 +4,10 @@ import { z } from "zod";
 import {v4 as uuidv4} from 'uuid';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
 import { S3Client } from '@aws-sdk/client-s3';
+import arcjet, { detectBot, fixedWindow } from "@arcjet/next";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { requireAdmin } from "@/app/data/admin/require-admin";
 
 // Simple S3 client without env validation for testing
 const S3 = new S3Client({
@@ -23,8 +27,32 @@ export const fileUploadSchema = z.object({
     isImage: z.boolean(),
 });
 
+const aj = arcjet({
+    key: process.env.ARCJET_KEY!,
+    rules: [
+        detectBot({
+            mode: 'LIVE',
+            allow: [],
+        }),
+        fixedWindow({
+            mode: 'LIVE',
+            window: "1m",
+            max: 5,
+        })
+    ]
+});
+
 export async function POST(request: Request){
+    
+    const session = await requireAdmin();
     try{
+
+        const decision = await aj.protect(request);
+
+        if(decision.isDenied()){
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+        }
+
         console.log('API Route called');
         console.log('Environment check:', {
             bucket: process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES,

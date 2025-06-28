@@ -1,11 +1,11 @@
-import "server-only";
+
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./db";
 import { env } from "./env";
 import { emailOTP } from "better-auth/plugins"
-import { Html } from "next/document";
 import { resend } from "./resend";
+import { admin } from "better-auth/plugins"
  
 export const auth = betterAuth({
     database: prismaAdapter(prisma, {
@@ -29,5 +29,6 @@ export const auth = betterAuth({
             });
             }
         }),
+        admin({})
     ],
 });
