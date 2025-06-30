@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import arcjet from "@/lib/arcjet";
 import { detectBot, fixedWindow } from "@arcjet/next";
 import { headers } from "next/headers";
+import { error } from "console";
 
 const aj = arcjet.withRule(
     detectBot({
@@ -108,6 +109,7 @@ export async function reorderLessons(
     lessons: { id: string; position: number }[],
     courseId : string
 ): Promise<ApiResponse> {
+    await requireAdmin();
     try {
         if(!lessons || lessons.length === 0) {
             return {
@@ -292,36 +294,35 @@ export async function deleteChapter(chapterId: string): Promise<ApiResponse> {
     }
 }
 
-export async function reorderChapters(courseId: string, chapterIds: string[]): Promise<ApiResponse> {
+export async function reorderChapters(
+    courseId: string, 
+    chapters: {id: string; position: number}[]
+): Promise<ApiResponse> {
+    await requireAdmin();
     try {
-        const user = await requireAdmin();
-        
-        console.log("Reorder chapters - User:", user.user.id);
-        console.log("Reorder chapters - Course ID:", courseId);
-        console.log("Reorder chapters - Chapter IDs:", chapterIds);
+        if( !chapters || chapters.length === 0) {
+            return {
+                status: "error",
+                message: "No chapters provided for reordering",
+            };
+        }
 
-        // Update positions
-        const updates = chapterIds.map((chapterId, index) => 
-            prisma.chapter.update({
-                where: { id: chapterId },
-                data: { position: index + 1 },
-            })
-        );
-
+        const updates = chapters.map((chapter) => prisma.chapter.update({
+            where: { 
+                id: chapter.id, 
+                courseId: courseId 
+            },
+            data: { position: chapter.position },
+        }));
         await prisma.$transaction(updates);
-        
-        console.log("Reorder chapters - Reordered successfully");
-        
-        // Revalidate cache
+
         revalidatePath(`/admin/courses/${courseId}/edit`);
-        
         return {
             status: "success",
             message: "Chapters reordered successfully",
         };
 
-    } catch (error) {
-        console.error("Reorder chapters - Error:", error);
+    } catch {
         return {
             status: "error",
             message: "Failed to reorder chapters: " + (error instanceof Error ? error.message : "Unknown error"),
@@ -376,3 +377,4 @@ export async function deleteLesson(lessonId: string): Promise<ApiResponse> {
         };
     }
 }
+

@@ -1,16 +1,16 @@
 "use client";
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { DndContext, DraggableSyntheticListeners, KeyboardSensor, PointerSensor, rectIntersection, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DraggableSyntheticListeners, KeyboardSensor, PointerSensor, rectIntersection, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { ReactNode, useState, useTransition } from "react";
+import { ReactNode, useEffect, useState, useTransition } from "react";
 import { AdminCourseSingularType } from '@/app/data/admin/admin-get-course';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { createChapter, updateChapter, deleteChapter, reorderChapters, deleteLesson } from '../actions';
+import { createChapter, updateChapter, deleteChapter, reorderChapters, deleteLesson, reorderLessons } from '../actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -39,28 +39,40 @@ export function CourseStructure({data, courseId}: iAppProps) {
     const [editingChapter, setEditingChapter] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState("");
 
-    const initialItems = data.chapters.map((chapter) => {
-        return {
+    const initialItems = data.chapters.map((chapter) => ({
             id: chapter.id,
             title: chapter.title,
             order: chapter.position,
             isOpen: true, //default chapters to open
-            lessons: chapter.lessons.map(lesson => {
-                return {
+            lessons: chapter.lessons.map(lesson => ({
                     id: lesson.id,
                     title: lesson.title,
                     order: lesson.position,
                     chapterId: chapter.id,
-                }
-            })
-        }
-    });
-
+            }))
+        }))
     const [items, setItems] = useState(initialItems);
 
     console.log(items)
 
-    // Get all sortable items (chapters + lessons)
+    useEffect(() => {
+        setItems((prevItems) => {
+            const updatedItems = data.chapters.map((chapter) => ({
+                id: chapter.id,
+                title: chapter.title,
+                order: chapter.position,
+                isOpen: prevItems.find((item) => item.id === chapter.id)?.isOpen ?? true,
+            lessons: chapter.lessons.map((lesson) => ({
+                    id: lesson.id,
+                    title: lesson.title,
+                    order: lesson.position,
+                    chapterId: chapter.id,
+            })),
+        })) || [];
+        return updatedItems;
+    });
+}, [data.chapters]);
+// Get all sortable items (chapters + lessons)
     const allSortableItems = [
         ...items.map(chapter => chapter.id),
         ...items.flatMap(chapter => chapter.lessons.map(lesson => lesson.id))
@@ -97,7 +109,7 @@ export function CourseStructure({data, courseId}: iAppProps) {
         );
     }
 
-    function handleDragEnd(event: any) {
+    function handleDragEnd(event: DragEndEvent) {
         const {active, over} = event;
         
         if (!over || active.id === over.id) {
@@ -140,8 +152,29 @@ export function CourseStructure({data, courseId}: iAppProps) {
             }));
             const previousItems = [...items];
             setItems(updatedChapterForState);
-        }
 
+            if(courseId) {
+                const chaptersToUpdate = updatedChapterForState.map((chapter) => ({
+                    id: chapter.id,
+                    position: chapter.order,
+                }));
+                const reorderPromise = () => 
+                    reorderChapters(courseId, chaptersToUpdate);
+                toast.promise(reorderPromise(), {
+                    loading: "Reordering chapters...",
+                    success: (result) => {
+                        if(result.status === "success") 
+                            return result.message;
+                        throw new Error(result.message);
+                    },
+                    error: () => {
+                        setItems(previousItems);
+                        return "Failed to reorder chapters";
+                    }
+                });
+            }
+            return;
+        }
         if(activeType === "lesson" && overType ==="lesson") {
             const chapterId = active.data.current?.chapterId;
             const overChapterId = over.data.current?.chapterId;
@@ -216,7 +249,7 @@ export function CourseStructure({data, courseId}: iAppProps) {
                 }
             });
         }
-        return;
+    }
     }
     function handleCreateChapter() {
         if (!newChapterTitle.trim()) {
@@ -319,7 +352,6 @@ export function CourseStructure({data, courseId}: iAppProps) {
             <Card>
                 <CardTitle className="flex flex-row items-center justify-between p-4 border-b border-border">
                     <span>Chapters</span>
-                <CardContent className='space-y-8' />
                     <Button 
                         onClick={() => setIsAddingChapter(true)}
                         size="sm"
